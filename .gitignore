@@ -1,0 +1,8 @@
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+*.png
+
+__pychache__/
+
