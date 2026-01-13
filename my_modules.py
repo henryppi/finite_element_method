@@ -113,13 +113,13 @@ def get_internal_external_edges(elem,neighbor):
 def is_point_inside_bbox(point,bbox,tol=0.0):
     return point[0]>=bbox[0]-tol and point[0]<=bbox[1]+tol and point[1]>=bbox[2]-tol and point[1]<=bbox[3]+tol
 
-def select_boundary(vert,elem,edge_ext,bbox):
+def select_boundary(vert,elem,edge_ext,bbox,tol=0.0):
     v0 = vert[edge_ext[:,0],:]
     v1 = vert[edge_ext[:,1],:]
     sel = []
     edge_sel = []
     for i in range(edge_ext.shape[0]):
-        if is_point_inside_bbox(v0[i,:],bbox) and is_point_inside_bbox(v1[i,:],bbox):
+        if is_point_inside_bbox(v0[i,:],bbox,tol) and is_point_inside_bbox(v1[i,:],bbox,tol):
             edge_sel.append(edge_ext[i,:])
             sel.append(i)
     edge_remain = np.delete(edge_ext,sel,axis=0)

@@ -19,10 +19,11 @@ neighbor = find_edge_neighbors(elem)
 
 edge_internal,edge_external = get_internal_external_edges(elem,neighbor)
 
+tol=0.01
 boundary = []
-edge_fix,edge_remain = select_boundary(vert,elem,edge_external,[0,0,0,height])
+edge_fix,edge_remain = select_boundary(vert,elem,edge_external,[0,0,0,height],tol)
 boundary.append(['fixed',edge_fix])
-edge_force,edge_remain = select_boundary(vert,elem,edge_remain,[width,width,0,height])
+edge_force,edge_remain = select_boundary(vert,elem,edge_remain,[width,width,0,height],tol)
 boundary.append(['force',edge_force])
 boundary.append(['free',edge_remain])
 
