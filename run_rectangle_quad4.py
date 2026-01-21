@@ -3,13 +3,13 @@ import matplotlib.pyplot as plt
 
 from my_modules import *
 
-width = 100
-height = 20
+width = 6
+height = 3
 
 rectangle = np.array([[0,0],[width,0],[width,height],[0,height]],float)
 
-xdiv = 10
-ydiv = 4
+xdiv = 6
+ydiv = 3
 etype = 'quad4'
 esize = 'ndiv'
 
@@ -33,4 +33,5 @@ ax = plot_mesh(ax,vert,elem,boundary)
 ax = plot_mesh_numbers(ax,vert,elem,boundary)
 ax.axis("equal")
 ax.axis("off")
+plt.savefig('./images/ass1_quad_mesh.png',bbox_inches='tight',dpi=200)
 plt.show()
