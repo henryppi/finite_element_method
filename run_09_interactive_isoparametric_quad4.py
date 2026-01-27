@@ -92,7 +92,7 @@ def make_grid_quad4(width,height,nx,ny):
     nodes[:,0] = xx.flatten()
     nodes[:,1] = yy.flatten()
     nex = nx-1
-    ney = nx-1
+    ney = ny-1
     elements = np.zeros([nex*ney,4],int)
     for j in range(ney):
         ind = np.arange(nex)+nex*j
