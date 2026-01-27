@@ -1,6 +1,7 @@
 import numpy as np
 from matplotlib.collections import PolyCollection
 import matplotlib.pyplot as plt
+from matplotlib.widgets import Slider,Button,TextBox
 
 def shape_fun_quad4_scalar(r,s):
     Nrs =  0.25*np.array([ (1 - r) * (1 - s),\
@@ -273,3 +274,101 @@ def plot_mesh_numbers(ax,vert,elem,boundary):
     for j in range(elem.shape[0]):
         ax.text(np.mean(vert[elem[j,:],0]),np.mean(vert[elem[j,:],1]), str(j), fontsize = 12, color='g')
     return ax
+
+class gui_control_quad_transform:
+    def __init__(self,points):
+        self.steps = 20
+        self.axcolor = 'lightgoldenrodyellow'
+
+        self.rotz_min = -180.0; self.rotz_val = self.rotz_init = 0.0; self.rotz_max = 180.0
+        self.trans_x_min = -2.0; self.trans_x_val = self.trans_x_init = 0.0; self.trans_x_max = 2.0
+        self.trans_y_min = -2.0; self.trans_y_val = self.trans_y_init = 0.0; self.trans_y_max = 2.0
+
+        self.scale_x_min = 0.0; self.scale_x_val = self.scale_x_init = 1.0; self.scale_x_max = 2
+        self.scale_y_min = 0.0; self.scale_y_val = self.scale_y_init = 1.0; self.scale_y_max = 2
+
+        self.shear_x_min = -1; self.shear_x_val = self.shear_x_init = 0.0; self.shear_x_max = 1
+        self.shear_y_min = -1; self.shear_y_val = self.shear_y_init = 0.0; self.shear_y_max = 1
+
+        self.u1x_min = -1.0+points[0,0]; self.u1x_val = self.u1x_init = 0.0+points[0,0]; self.u1x_max = 1.0+points[0,0]
+        self.u1y_min = -1.0+points[0,1]; self.u1y_val = self.u1y_init = 0.0+points[0,1]; self.u1y_max = 1.0+points[0,1]
+        self.u2x_min = -1.0+points[1,0]; self.u2x_val = self.u2x_init = 0.0+points[1,0]; self.u2x_max = 1.0+points[1,0]
+        self.u2y_min = -1.0+points[1,1]; self.u2y_val = self.u2y_init = 0.0+points[1,1]; self.u2y_max = 1.0+points[1,1]
+        self.u3x_min = -1.0+points[2,0]; self.u3x_val = self.u3x_init = 0.0+points[2,0]; self.u3x_max = 1.0+points[2,0]
+        self.u3y_min = -1.0+points[2,1]; self.u3y_val = self.u3y_init = 0.0+points[2,1]; self.u3y_max = 1.0+points[2,1]
+        self.u4x_min = -1.0+points[3,0]; self.u4x_val = self.u4x_init = 0.0+points[3,0]; self.u4x_max = 1.0+points[3,0]
+        self.u4y_min = -1.0+points[3,1]; self.u4y_val = self.u4y_init = 0.0+points[3,1]; self.u4y_max = 1.0+points[3,1]
+
+    def get_points(self):
+        return  np.array([[self.u1x_init,self.u1y_init],\
+                          [self.u2x_init,self.u2y_init],\
+                          [self.u3x_init,self.u3y_init],\
+                          [self.u4x_init,self.u4y_init]])
+
+    def get_slider_val_transform(self):
+        return self.slider_trans_x.val,\
+               self.slider_trans_y.val,\
+               self.slider_rotz.val,\
+               self.slider_scale_x.val,\
+               self.slider_scale_y.val,\
+               self.slider_shear_x.val,\
+               self.slider_shear_y.val
+
+    def get_slider_val_displacement(self):
+        return self.slider_u1x.val,self.slider_u1y.val,\
+               self.slider_u2x.val,self.slider_u2y.val,\
+               self.slider_u3x.val,self.slider_u3y.val,\
+               self.slider_u4x.val,self.slider_u4y.val
+
+    def init_slider(self,plt):
+        self.ax_rotz = plt.axes([0.6, 0.95, 0.3, 0.03], facecolor=self.axcolor) #left bottom width height
+        self.ax_trans_x = plt.axes([0.6, 0.90, 0.3, 0.03], facecolor=self.axcolor) #left bottom width height
+        self.ax_trans_y = plt.axes([0.6, 0.85, 0.3, 0.03], facecolor=self.axcolor) #left bottom width height
+        self.ax_scale_x = plt.axes([0.6, 0.80, 0.3, 0.03], facecolor=self.axcolor) #left bottom width height
+        self.ax_scale_y = plt.axes([0.6, 0.75, 0.3, 0.03], facecolor=self.axcolor) #left bottom width height
+        self.ax_shear_x = plt.axes([0.6, 0.70, 0.3, 0.03], facecolor=self.axcolor) #left bottom width height
+        self.ax_shear_y = plt.axes([0.6, 0.65, 0.3, 0.03], facecolor=self.axcolor) #left bottom width height
+
+        self.ax_u1x = plt.axes([0.6, 0.40, 0.3, 0.03], facecolor=self.axcolor) #left bottom width height
+        self.ax_u1y = plt.axes([0.6, 0.35, 0.3, 0.03], facecolor=self.axcolor) #left bottom width height
+        self.ax_u2x = plt.axes([0.6, 0.30, 0.3, 0.03], facecolor=self.axcolor) #left bottom width height
+        self.ax_u2y = plt.axes([0.6, 0.25, 0.3, 0.03], facecolor=self.axcolor) #left bottom width height
+        self.ax_u3x = plt.axes([0.6, 0.20, 0.3, 0.03], facecolor=self.axcolor) #left bottom width height
+        self.ax_u3y = plt.axes([0.6, 0.15, 0.3, 0.03], facecolor=self.axcolor) #left bottom width height
+        self.ax_u4x = plt.axes([0.6, 0.10, 0.3, 0.03], facecolor=self.axcolor) #left bottom width height
+        self.ax_u4y = plt.axes([0.6, 0.05, 0.3, 0.03], facecolor=self.axcolor) #left bottom width height
+
+        self.slider_rotz = Slider(self.ax_rotz, 'rot z', self.rotz_min, self.rotz_max, valinit=self.rotz_init, valstep=(self.rotz_max-self.rotz_min)/self.steps)
+        self.slider_trans_x = Slider(self.ax_trans_x,' trans x', self.trans_x_min, self.trans_x_max, valinit=self.trans_x_init, valstep=(self.trans_x_max-self.trans_x_min)/self.steps)
+        self.slider_trans_y = Slider(self.ax_trans_y, 'trans y', self.trans_y_min, self.trans_y_max, valinit=self.trans_y_init, valstep=(self.trans_y_max-self.trans_y_min)/self.steps)
+        self.slider_scale_x = Slider(self.ax_scale_x, 'scale x', self.scale_x_min, self.scale_x_max, valinit=self.scale_x_init, valstep=(self.scale_x_max-self.scale_x_min)/self.steps)
+        self.slider_scale_y = Slider(self.ax_scale_y, 'scale y', self.scale_y_min, self.scale_y_max, valinit=self.scale_y_init, valstep=(self.scale_y_max-self.scale_y_min)/self.steps)
+        self.slider_shear_x = Slider(self.ax_shear_x, 'shear x', self.shear_x_min, self.shear_x_max, valinit=self.shear_x_init, valstep=(self.shear_x_max-self.shear_x_min)/self.steps)
+        self.slider_shear_y = Slider(self.ax_shear_y, 'shear y', self.shear_y_min, self.shear_y_max, valinit=self.shear_y_init, valstep=(self.shear_y_max-self.shear_y_min)/self.steps)
+
+        self.slider_u1x = Slider(self.ax_u1x, 'u1x', self.u1x_min, self.u1x_max, valinit=self.u1x_init, valstep=(self.u1x_max-self.u1x_min)/self.steps)
+        self.slider_u1y = Slider(self.ax_u1y, 'u1y', self.u1y_min, self.u1y_max, valinit=self.u1y_init, valstep=(self.u1y_max-self.u1y_min)/self.steps)
+        self.slider_u2x = Slider(self.ax_u2x, 'u2x', self.u2x_min, self.u2x_max, valinit=self.u2x_init, valstep=(self.u2x_max-self.u2x_min)/self.steps)
+        self.slider_u2y = Slider(self.ax_u2y, 'u2y', self.u2y_min, self.u2y_max, valinit=self.u2y_init, valstep=(self.u2y_max-self.u2y_min)/self.steps)
+        self.slider_u3x = Slider(self.ax_u3x, 'u3x', self.u3x_min, self.u3x_max, valinit=self.u3x_init, valstep=(self.u3x_max-self.u3x_min)/self.steps)
+        self.slider_u3y = Slider(self.ax_u3y, 'u3y', self.u3y_min, self.u3y_max, valinit=self.u3y_init, valstep=(self.u3y_max-self.u3y_min)/self.steps)
+        self.slider_u4x = Slider(self.ax_u4x, 'u4x', self.u4x_min, self.u4x_max, valinit=self.u4x_init, valstep=(self.u4x_max-self.u4x_min)/self.steps)
+        self.slider_u4y = Slider(self.ax_u4y, 'u4y', self.u4y_min, self.u4y_max, valinit=self.u4y_init, valstep=(self.u4y_max-self.u4y_min)/self.steps)
+    
+    def observer(self,update_fig):
+        self.slider_rotz.on_changed(update_fig)
+        self.slider_trans_x.on_changed(update_fig)
+        self.slider_trans_y.on_changed(update_fig)
+        self.slider_scale_x.on_changed(update_fig)
+        self.slider_scale_y.on_changed(update_fig)
+        self.slider_shear_x.on_changed(update_fig)
+        self.slider_shear_y.on_changed(update_fig)
+
+        self.slider_u1x.on_changed(update_fig)
+        self.slider_u1y.on_changed(update_fig)
+        self.slider_u2x.on_changed(update_fig)
+        self.slider_u2y.on_changed(update_fig)
+        self.slider_u3x.on_changed(update_fig)
+        self.slider_u3y.on_changed(update_fig)
+        self.slider_u4x.on_changed(update_fig)
+        self.slider_u4y.on_changed(update_fig)
