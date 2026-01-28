@@ -20,9 +20,20 @@ vertices = np.zeros([nVertices,2],float)
 vertices[:,0] = xx.flatten()
 vertices[:,1] = yy.flatten()
 
-elements = np.array([[0,1,5,4]],int)
+# elements = np.array([[0,1,5,4]],int)
 
-line_index = [3,7,11]
+elements = np.zeros([nx*ny,4],int)
+for j in range(ny):
+    ind = np.arange(nx)+nx*j
+    elements[ind,0] = np.arange(0,nx)  +j*nx+j
+    elements[ind,1] = np.arange(1,nx+1) +j*nx+j
+    elements[ind,2] = np.arange(1,nx+1) +(j+1)*nx + j+1
+    elements[ind,3] = np.arange(0,nx)   +(j+1)*nx + j+1
+
+print(elements)
+nElements = elements.shape[0]
+
+
 
 fig = plt.figure(figsize=(8,6))
 ax = fig.add_subplot(111)
@@ -36,13 +47,16 @@ pc = PolyCollection(vertices[elements],\
                     linewidth=1)
 ax.add_collection(pc)
 
-# red line
-ax.plot(vertices[line_index,0],vertices[line_index,1],'-r',lw=2)
-
 # black vertex points
 ax.plot(vertices[:,0],vertices[:,1],linestyle='none',color='k',marker='.',markersize=5)
 
 # text at vertices 
 for i in range(nVertices):
     ax.text(vertices[i,0],vertices[i,1], ' V'+str(i),fontsize=12,color='k')
+
+# text at element center 
+for i in range(nElements):
+    cx = np.mean(vertices[elements[i,:],0])
+    cy = np.mean(vertices[elements[i,:],1])
+    ax.text(cx,cy, 'E'+str(i),fontsize=12,color='g')
 plt.show()
