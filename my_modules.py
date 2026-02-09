@@ -1,7 +1,17 @@
 import numpy as np
 from matplotlib.collections import PolyCollection
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Slider,Button,TextBox
+from matplotlib.widgets import Slider,Button,TextBox,RadioButtons
+
+def mag(v):
+    return np.sqrt(np.sum(v**2))
+
+def apply_fixed_constraint(K,dof):
+    for i in dof:
+        K[:,i] = 0.
+        K[i,:] = 0.
+        K[i,i] = 1.
+    return K
 
 def shape_fun_quad4_scalar(r,s):
     Nrs =  0.25*np.array([ (1 - r) * (1 - s),\
@@ -60,6 +70,11 @@ def shape_fun_quad4(r,s):
     Nrs[:,3] = 0.25*(1 - r) * (1 + s)
     return Nrs
 
+def shape_fun_quad4_grad(r,s):
+    dNdX =  0.25*np.array([[-1 + s , 1 - s , 1 + s , -1 - s ],\
+                  [-1 + r ,-1 - r , 1 + r ,  1 - r ]])
+    return dNdX
+
 def transform_quad4(points,nodes_init):
     Nrs = shape_fun_quad4(nodes_init[:,0],nodes_init[:,1])
     n = nodes_init.shape[0]
@@ -69,6 +84,49 @@ def transform_quad4(points,nodes_init):
         nodes[:,1] += Nrs[:,i]*points[i,1]
         
     return nodes
+
+def fem_solve_single_quad(nodes,bc_type,force,E,nu,t,order):
+    ind_fix = np.where(bc_type==True)[0]
+    
+    D = (E/(1.0-nu**2))*np.array([[ 1.0, nu,  0.0         ],\
+                    [ nu,  1.0, 0.0         ],\
+                    [ 0.0, 0.0, 0.5*(1.0-nu)]])
+    displacement = np.zeros([8,1],float)
+
+    
+    gp,gw = gauss_points_quad(order)
+    ngp =gp.shape[0]
+    
+    X = nodes
+
+    Kloc = np.zeros([8,8],float)
+    bloc = np.zeros([8,1],float)
+    bloc[:,0] = force[:]
+    for ip in range(ngp):
+        Nrs = shape_fun_quad4(gp[ip,0],gp[ip,1])
+        dNrs = shape_fun_quad4_grad(gp[ip,0],gp[ip,1])
+        J = np.matrix(dNrs)*np.matrix(X)
+        detJ = J[0,0]*J[1,1] - J[1,0]*J[0,1]
+        invJ = (1.0/detJ)*np.matrix([[J[1,1],-J[0,1]],[-J[1,0],J[0,0]]])
+        dNdX = invJ*dNrs
+        B = np.matrix([[dNdX[0,0], 0.0, dNdX[0,1], 0.0, dNdX[0,2], 0.0, dNdX[0,3], 0.0],\
+            [0.0, dNdX[1,0], 0.0, dNdX[1,1], 0.0, dNdX[1,2], 0.0, dNdX[1,3]],\
+            [dNdX[1,0], dNdX[0,0], dNdX[1,1], dNdX[0,1], dNdX[1,2], dNdX[0,2], dNdX[1,3], dNdX[0,3]]])
+        Kloc[:,:] += t*B.T*D*B*detJ*gw[ip];
+    
+    
+    Kloc = apply_fixed_constraint(Kloc,ind_fix)
+    
+    displacement = np.linalg.solve(Kloc, bloc)
+    
+    return displacement
+
+def compute_principle_stress(sigma):
+    ps = np.zeros(3,float)
+    ps[1] = 0.5*(sigma[0]-sigma[1])+np.sqrt(0.25*(sigma[0]+sigma[1])**2+sigma[2]**2)
+    ps[0] = 0.5*(sigma[0]-sigma[1])-np.sqrt(0.25*(sigma[0]+sigma[1])**2+sigma[2]**2)
+    ps[2] = 0.5*np.arctan2(2*sigma[2],(sigma[0]-sigma[1]))#+0.5*np.pi
+    return ps
 
 def get_area_quad4(points,order):
     gp,gw = gauss_points_quad(order)
@@ -372,3 +430,120 @@ class gui_control_quad_transform:
         self.slider_u3y.on_changed(update_fig)
         self.slider_u4x.on_changed(update_fig)
         self.slider_u4y.on_changed(update_fig)
+
+
+class gui_control_quad_solve:
+    def __init__(self,points_init):
+        self.points_init = points_init
+        self.steps = 20
+        self.axcolor = 'lightgoldenrodyellow'
+
+        self.f1_min = -1; self.f1_val = self.f1_init = 0.0; self.f1_max = 1
+        self.f2_min = -1; self.f2_val = self.f2_init = 0.0; self.f2_max = 1
+        self.f3_min = -1; self.f3_val = self.f3_init = 0.0; self.f3_max = 1
+        self.f4_min = -1; self.f4_val = self.f4_init = 0.0; self.f4_max = 1
+        self.f5_min = -1; self.f5_val = self.f5_init = 0.0; self.f5_max = 1
+        self.f6_min = -1; self.f6_val = self.f6_init = 0.0; self.f6_max = 1
+        self.f7_min = -1; self.f7_val = self.f7_init = 0.0; self.f7_max = 1
+        self.f8_min = -1; self.f8_val = self.f8_init = 0.0; self.f8_max = 1
+
+    def get_slider_force(self):
+        return np.array([self.slider_f1.val,\
+                         self.slider_f2.val,\
+                         self.slider_f3.val,\
+                         self.slider_f4.val,\
+                         self.slider_f5.val,\
+                         self.slider_f6.val,\
+                         self.slider_f7.val,\
+                         self.slider_f8.val])
+    
+    def get_radio_button_values(self):
+        return [self.radio1.value_selected,\
+                self.radio2.value_selected,\
+                self.radio3.value_selected,\
+                self.radio4.value_selected,\
+                self.radio5.value_selected,\
+                self.radio6.value_selected,\
+                self.radio7.value_selected,\
+                self.radio8.value_selected]
+    
+    def init_slider(self,plt):
+        self.rax1 = plt.axes([0.6, 0.88, 0.06, 0.11], facecolor=self.axcolor) #left bottom width height
+        self.rax2 = plt.axes([0.6, 0.76, 0.06, 0.11], facecolor=self.axcolor) #left bottom width height
+        self.rax3 = plt.axes([0.6, 0.64, 0.06, 0.11], facecolor=self.axcolor) #left bottom width height
+        self.rax4 = plt.axes([0.6, 0.52, 0.06, 0.11], facecolor=self.axcolor) #left bottom width height
+        self.rax5 = plt.axes([0.6, 0.40, 0.06, 0.11], facecolor=self.axcolor) #left bottom width height
+        self.rax6 = plt.axes([0.6, 0.28, 0.06, 0.11], facecolor=self.axcolor) #left bottom width height
+        self.rax7 = plt.axes([0.6, 0.16, 0.06, 0.11], facecolor=self.axcolor) #left bottom width height
+        self.rax8 = plt.axes([0.6, 0.04, 0.06, 0.11], facecolor=self.axcolor) #left bottom width height
+
+        self.radio1 = RadioButtons(self.rax1, ('fixed', 'force'))
+        self.radio2 = RadioButtons(self.rax2, ('fixed', 'force'))
+        self.radio3 = RadioButtons(self.rax3, ('fixed', 'force'),active=1)
+        self.radio4 = RadioButtons(self.rax4, ('fixed', 'force'))
+        self.radio5 = RadioButtons(self.rax5, ('fixed', 'force'),active=1)
+        self.radio6 = RadioButtons(self.rax6, ('fixed', 'force'),active=1)
+        self.radio7 = RadioButtons(self.rax7, ('fixed', 'force'))
+        self.radio8 = RadioButtons(self.rax8, ('fixed', 'force'),active=1)
+
+        self.ax_f1 = plt.axes([0.7, 0.92, 0.2, 0.04], facecolor=self.axcolor) #left bottom width height
+        self.ax_f2 = plt.axes([0.7, 0.80, 0.2, 0.04], facecolor=self.axcolor) #left bottom width height
+        self.ax_f3 = plt.axes([0.7, 0.68, 0.2, 0.04], facecolor=self.axcolor) #left bottom width height
+        self.ax_f4 = plt.axes([0.7, 0.56, 0.2, 0.04], facecolor=self.axcolor) #left bottom width height
+        self.ax_f5 = plt.axes([0.7, 0.44, 0.2, 0.04], facecolor=self.axcolor) #left bottom width height
+        self.ax_f6 = plt.axes([0.7, 0.32, 0.2, 0.04], facecolor=self.axcolor) #left bottom width height
+        self.ax_f7 = plt.axes([0.7, 0.20, 0.2, 0.04], facecolor=self.axcolor) #left bottom width height
+        self.ax_f8 = plt.axes([0.7, 0.08, 0.2, 0.04], facecolor=self.axcolor) #left bottom width height
+        self.slider_f1 = Slider(self.ax_f1, 'P1 Fx', self.f1_min, self.f1_max, valinit=self.f1_init, valstep=(self.f1_max-self.f1_min)/self.steps)
+        self.slider_f2 = Slider(self.ax_f2, 'P1 Fy', self.f2_min, self.f2_max, valinit=self.f2_init, valstep=(self.f2_max-self.f2_min)/self.steps)
+        self.slider_f3 = Slider(self.ax_f3, 'P2 Fx', self.f3_min, self.f3_max, valinit=self.f3_init, valstep=(self.f3_max-self.f3_min)/self.steps)
+        self.slider_f4 = Slider(self.ax_f4, 'P2 Fy', self.f4_min, self.f4_max, valinit=self.f4_init, valstep=(self.f4_max-self.f4_min)/self.steps)
+        self.slider_f5 = Slider(self.ax_f5, 'P3 Fx', self.f5_min, self.f5_max, valinit=self.f5_init, valstep=(self.f5_max-self.f5_min)/self.steps)
+        self.slider_f6 = Slider(self.ax_f6, 'P3 Fy', self.f6_min, self.f6_max, valinit=self.f6_init, valstep=(self.f6_max-self.f6_min)/self.steps)
+        self.slider_f7 = Slider(self.ax_f7, 'P4 Fx', self.f7_min, self.f7_max, valinit=self.f7_init, valstep=(self.f7_max-self.f7_min)/self.steps)
+        self.slider_f8 = Slider(self.ax_f8, 'P4 Fy', self.f8_min, self.f8_max, valinit=self.f8_init, valstep=(self.f8_max-self.f8_min)/self.steps)
+
+    def init_text_field(self,ax):
+        epsilon = np.zeros(3)
+        sigma = np.zeros(3)
+        sigma_p0 = np.zeros(3)
+        sigmaVonMises = 0.0
+        self.txt1 = ax.text(-1,-0.9,"exx = {:.2e}    sxx = {:.2e}".format(epsilon[0],sigma[0]))
+        self.txt2 = ax.text(-1,-1.0,"eyy = {:.2e}    syy = {:.2e}".format(epsilon[1],sigma[1]))
+        self.txt3 = ax.text(-1,-1.1,"exy = {:.2e}    sxy = {:.2e}".format(epsilon[2],sigma[2]))
+        self.txt4 = ax.text(-1,-0.75,"seqv = {:.2e}    s11 = {:.2e}    s22 = {:.2e} theta = {}deg".format(sigmaVonMises,sigma_p0[0],sigma_p0[1],int(sigma_p0[2]*180/np.pi)))
+
+        self.txtp1 = ax.text(self.points_init[0,0]-0.15,self.points_init[0,1]-0.25,"1",fontsize=16)
+        self.txtp2 = ax.text(self.points_init[1,0]+0.1,self.points_init[1,1]-0.25,"2",fontsize=16)
+        self.txtp3 = ax.text(self.points_init[2,0]+0.1,self.points_init[2,1]+0.15,"3",fontsize=16)
+        self.txtp4 = ax.text(self.points_init[3,0]-0.1,self.points_init[3,1]+0.15,"4",fontsize=16)
+
+    def update_text_field(self,points,epsilon,sigma,sigma_p0,sigmaVonMises):
+        self.txt1.set_text("exx = {:.2e}    sxx = {:.2e}".format(epsilon[0],sigma[0]))
+        self.txt2.set_text("eyy = {:.2e}    syy = {:.2e}".format(epsilon[1],sigma[1]))
+        self.txt3.set_text("exy = {:.2e}    sxy = {:.2e}".format(epsilon[2],sigma[2]))
+        self.txt4.set_text("seqv = {:.2e}    s11 = {:.2e}    s22 = {:.2e} theta = {}deg".format(sigmaVonMises, sigma_p0[0], sigma_p0[1], int(sigma_p0[2]*180/np.pi)))
+
+        self.txtp1.set_position([points[0,0]-0.15,points[0,1]-0.25])
+        self.txtp2.set_position([points[1,0]+0.1,points[1,1]-0.25])
+        self.txtp3.set_position([points[2,0]+0.1,points[2,1]+0.15])
+        self.txtp4.set_position([points[3,0]-0.1,points[3,1]+0.15])
+
+    def observer(self,update_fig):
+        self.slider_f1.on_changed(update_fig)
+        self.slider_f2.on_changed(update_fig)
+        self.slider_f3.on_changed(update_fig)
+        self.slider_f4.on_changed(update_fig)
+        self.slider_f5.on_changed(update_fig)
+        self.slider_f6.on_changed(update_fig)
+        self.slider_f7.on_changed(update_fig)
+        self.slider_f8.on_changed(update_fig)
+
+        self.radio1.on_clicked(update_fig)
+        self.radio2.on_clicked(update_fig)
+        self.radio3.on_clicked(update_fig)
+        self.radio4.on_clicked(update_fig)
+        self.radio5.on_clicked(update_fig)
+        self.radio6.on_clicked(update_fig)
+        self.radio7.on_clicked(update_fig)
+        self.radio8.on_clicked(update_fig)
