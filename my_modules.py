@@ -1,7 +1,11 @@
 import numpy as np
 from matplotlib.collections import PolyCollection
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 from matplotlib.widgets import Slider,Button,TextBox,RadioButtons
+from scipy.sparse import coo_matrix
+from matplotlib.patches import Polygon
+from matplotlib.collections import PatchCollection
 
 def mag(v):
     return np.sqrt(np.sum(v**2))
@@ -120,6 +124,13 @@ def fem_solve_single_quad(nodes,bc_type,force,E,nu,t,order):
     displacement = np.linalg.solve(Kloc, bloc)
     
     return displacement
+
+def mat2ijv(mat,ind):
+    nRow,nCol = mat.shape 
+    rows = np.tile(ind,nRow)
+    cols = np.repeat(ind,nCol)
+    vals = mat.ravel()
+    return rows.tolist(),cols.tolist(),vals.tolist()
 
 def compute_principle_stress(sigma):
     ps = np.zeros(3,float)
@@ -266,6 +277,27 @@ def select_boundary(vert,elem,edge_ext,bbox,tol=0.0):
 
     return np.asarray(edge_sel),edge_remain
 
+def node_select_bbox_2D(vertices,bbox,border=0):
+    bbox += [-border,-border,border,border]
+    nVert,nDim = vertices.shape
+    
+    xminBool = np.zeros([nVert,1],bool)
+    xmaxBool = np.zeros([nVert,1],bool)
+    yminBool = np.zeros([nVert,1],bool)
+    ymaxBool = np.zeros([nVert,1],bool)
+    xmin = np.where(vertices[:,0]>=bbox[0])[0] 
+    xmax = np.where(vertices[:,0]<=bbox[2])[0]        
+    ymin = np.where(vertices[:,1]>=bbox[1])[0]
+    ymax = np.where(vertices[:,1]<=bbox[3])[0]
+    xminBool[xmin,0] = True
+    xmaxBool[xmax,0] = True
+    yminBool[ymin,0] = True
+    ymaxBool[ymax,0] = True
+
+    mask = xminBool & xmaxBool & yminBool & ymaxBool
+    ind = np.where(mask==True)[0]
+    return np.array([ind]).T.astype(int)
+
 def post_processing(nodes,displacement,E,nu,t,order):
     
     D = (E/(1.0-nu**2))*np.array([[ 1.0, nu,  0.0         ],\
@@ -294,6 +326,53 @@ def post_processing(nodes,displacement,E,nu,t,order):
         sigma += np.matrix(D)*epsilon
     sigmaVonMises = np.sqrt( sigma[0,0]**2 + sigma[1,0]**2 - sigma[0,0]*sigma[1,0] + 3.0*sigma[2,0]**2 )
     return epsilon.flatten(),sigma.flatten(),sigmaVonMises
+
+def post_processing_global(nodes,elements,u_glob,D):
+    gauss_order = 2
+    nElem = elements.shape[0]
+    epsilon = np.zeros([nElem,3],float)
+    sigma = np.zeros([nElem,3],float)
+    vonMises = np.zeros([nElem,1],float)
+
+    gp,gw = gauss_points_quad(gauss_order)
+    ngp = gp.shape[0]
+
+    ix = np.arange(0,8,2)
+    iy = np.arange(0,8,2)+1
+    dof_glob = np.zeros([8],int)
+    u_loc = np.zeros([8,1],float)
+        
+    for m in range(nElem):
+        ind = elements[m,:]
+        X = nodes[ind,:]
+
+        
+        dof_glob[ix] = ind*2
+        dof_glob[iy] = ind*2+1
+        u_loc[:,0] = u_glob[dof_glob]
+        
+        epsilon_elem = np.zeros([3,1])
+        sigma_elem = np.zeros([3,1])
+        
+        Kloc = np.zeros([8,8],float)
+        bloc = np.zeros([8,1],float)
+        for ip in range(ngp):
+            Nrs = shape_fun_quad4(gp[ip,0],gp[ip,1])
+            dNrs = shape_fun_quad4_grad(gp[ip,0],gp[ip,1])
+            J = np.matrix(dNrs)*np.matrix(X)
+            detJ = J[0,0]*J[1,1] - J[1,0]*J[0,1]
+            invJ = (1.0/detJ)*np.matrix([[J[1,1],-J[0,1]],[-J[1,0],J[0,0]]])
+            dNdX = invJ*dNrs
+            B = np.matrix([[dNdX[0,0], 0.0, dNdX[0,1], 0.0, dNdX[0,2], 0.0, dNdX[0,3], 0.0],\
+                [0.0, dNdX[1,0], 0.0, dNdX[1,1], 0.0, dNdX[1,2], 0.0, dNdX[1,3]],\
+                [dNdX[1,0], dNdX[0,0], dNdX[1,1], dNdX[0,1], dNdX[1,2], dNdX[0,2], dNdX[1,3], dNdX[0,3]]])
+            epsilon_elem += B*u_loc*detJ*gw[ip]
+            sigma_elem += np.matrix(D)*epsilon_elem
+        epsilon[m,:] = epsilon_elem.T
+        sigma[m,:] = sigma_elem.T
+        vonMises[m,0] = np.sqrt( sigma_elem[0,0]**2 + sigma_elem[1,0]**2 - sigma_elem[0,0]*sigma_elem[1,0] + 3*sigma_elem[2,0]**2 )
+        
+    return epsilon,sigma,vonMises
 
 def plot_mesh(ax,vert,elem,boundary):
     # elements 
@@ -332,6 +411,106 @@ def plot_mesh_numbers(ax,vert,elem,boundary):
     for j in range(elem.shape[0]):
         ax.text(np.mean(vert[elem[j,:],0]),np.mean(vert[elem[j,:],1]), str(j), fontsize = 12, color='g')
     return ax
+
+def visu(L,
+         H,
+         nodes,
+         elements,
+         nElem,
+         displacement,
+         maxDisp,
+         scaleDeformation,
+         ind_load,
+         dof_load,
+         bglob,
+         dof_support,
+         vonMises,fn):
+    fig, (ax1,ax2) = plt.subplots(2, 1)
+    fig.patch.set_visible(False)
+
+    diag = np.sqrt((np.max(nodes[:,0])-np.min(nodes[:,0]))**2+(np.max(nodes[:,1])-np.min(nodes[:,1]))**2)
+    nodes_deformed = nodes + (scaleDeformation*diag/maxDisp)*displacement
+
+    # plot Mesh & BC
+    patches = []
+    for i in range(nElem):
+        elem =elements[i,:]
+        x = nodes[elem,0]
+        y = nodes[elem,1]
+        X = np.concatenate((np.array([x]).T,np.array([y]).T),axis=1)
+        # polygon = Polygon(X, True)
+        polygon = Polygon(X)
+        patches.append(polygon)
+
+    p = PatchCollection(patches, cmap=cm.jet, alpha=1.0,edgecolor='black',facecolor='lightgreen',linewidth=1)
+    ax1.add_collection(p)
+
+    for i in range(len(dof_load)):
+        if (dof_load[i] % 2) == 0:
+            ax1.quiver(nodes[int((dof_load[i])/2),0], nodes[int((dof_load[i])/2),1],
+                       [np.sign(bglob[dof_load[i],0])],[0],
+                       color='red')
+        else:
+            ax1.quiver(nodes[int((dof_load[i]-1)/2),0], nodes[int((dof_load[i]-1)/2),1],
+                       [0],[np.sign( bglob[dof_load[i],0] )],
+                       color='red')
+
+    for i in range(len(dof_support)):
+        if (dof_support[i] % 2) == 0:
+            ax1.plot(nodes[int((dof_support[i])/2),0], nodes[int((dof_support[i])/2),1],
+            marker=5,
+            markersize=1/scaleDeformation,
+            fillstyle='full',
+            markerfacecolor='blue',
+            markeredgecolor='none')
+
+        else:
+            ax1.plot(nodes[int((dof_support[i]-1)/2),0], nodes[int((dof_support[i]-1)/2),1],
+            marker=6,
+            markersize=1/scaleDeformation,
+            fillstyle='full',
+            markerfacecolor='blue',
+            markeredgecolor='none')
+
+    ax1.set_title('Mesh & BC')
+    ax1.axis('off')
+    ax1.set_xlim([0,L])
+    ax1.set_ylim([0,H])
+    ax1.axis('equal')
+
+    # plot Displacement & von Mises stress
+    patches = []
+    for i in range(nElem):
+        elem =elements[i,:]
+        x = nodes_deformed[elem,0]
+        y = nodes_deformed[elem,1]
+        X = np.concatenate((np.array([x]).T,np.array([y]).T),axis=1)
+        # polygon = Polygon(X, True)
+        polygon = Polygon(X)
+        patches.append(polygon)
+
+    p = PatchCollection(patches, cmap=cm.jet, alpha=1.0,edgecolor='none',linewidth=0)
+
+    field = vonMises[:].flatten()
+    minField = np.min(field)
+    maxField = np.max(field)
+
+    nColors = 128
+    color_ind = np.round((nColors-1)*((field-minField)/(maxField-minField)))
+    color_ind = color_ind.astype(int)
+
+    maxF = np.max(field)
+    colors = 100*field/maxF
+    p.set_array(np.array(colors))
+
+    ax2.add_collection(p)
+    ax2.set_title('Displacement & von Mises stress')
+    ax2.axis('off')
+    ax2.set_xlim([0,L])
+    ax2.set_ylim([0,H])
+    ax2.axis('equal')
+
+    plt.savefig(fn,dpi=200, bbox_inches='tight', pad_inches=0)
 
 class gui_control_quad_transform:
     def __init__(self,points):
