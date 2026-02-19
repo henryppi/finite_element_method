@@ -425,7 +425,7 @@ def visu(L,
          bglob,
          dof_support,
          vonMises,fn):
-    fig, (ax1,ax2) = plt.subplots(2, 1)
+    fig, (ax1,ax2) = plt.subplots(2, 1,figsize=(12,8),facecolor='w',frameon=False)
     fig.patch.set_visible(False)
 
     diag = np.sqrt((np.max(nodes[:,0])-np.min(nodes[:,0]))**2+(np.max(nodes[:,1])-np.min(nodes[:,1]))**2)
@@ -510,7 +510,7 @@ def visu(L,
     ax2.set_ylim([0,H])
     ax2.axis('equal')
 
-    plt.savefig(fn,dpi=200, bbox_inches='tight', pad_inches=0)
+    plt.savefig(fn,dpi=300, bbox_inches='tight', pad_inches=0)
 
 class gui_control_quad_transform:
     def __init__(self,points):

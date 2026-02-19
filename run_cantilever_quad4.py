@@ -6,8 +6,8 @@ from my_modules import *
 
 # case setup
 
-width = 6
-height = 3
+width = 100
+height = 20
 force = -10.0
 
 gauss_order = 2
@@ -16,8 +16,8 @@ nu = 0.288
 E = 206.94e9
 
 scaleDeformation = 0.1
-xdiv = 12
-ydiv = 6
+xdiv = 20
+ydiv = 5
 etype = 'quad4'
 esize = 'ndiv'
 
