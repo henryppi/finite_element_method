@@ -6,8 +6,8 @@ from my_modules import *
 
 # case setup
 
-width = 100
-height = 20
+width =  100
+height = 50
 force = -10.0
 
 gauss_order = 2
@@ -17,7 +17,7 @@ E = 206.94e9
 
 scaleDeformation = 0.1
 xdiv = 20
-ydiv = 5
+ydiv = 10
 etype = 'quad4'
 esize = 'ndiv'
 
@@ -98,11 +98,16 @@ for i in dof_support:
     Kglob[i,i] = 1.
 
 # load vector
-vert_ind_load = node_select_bbox_2D(vert,np.array([width,height, width, height],float),tol)
-vert_dof_load = 2*vert_ind_load+1
+# vert_ind_load = node_select_bbox_2D(vert,np.array([0.8*width,height, 0.8*width, height],float),tol)
+vert_ind_load = node_select_bbox_2D(vert,np.array([width, 0, width, height],float),tol)
+# vert_ind_load = node_select_bbox_2D(vert,np.array([width, height, width, height],float),tol)
+dof_load = np.array([],int)
+# dof_load = np.append(dof_load,2*vert_ind_load) # x-dir
+dof_load = np.append(dof_load,2*vert_ind_load+1) # y-dir
+
 
 bglob = np.zeros([nDof,1],float)
-bglob[vert_dof_load,0] = force
+bglob[dof_load,0] = force
 
 # plt.spy(Kglob.todense())
 # plt.show()
@@ -127,20 +132,26 @@ print('min stress  xx: {:.2e},\tyy: {:.2e},\txy: {:.2e}'.format(min_sigma[0],min
 print('max stress  xx: {:.2e},\tyy: {:.2e},\txy: {:.2e}'.format(max_sigma[0],max_sigma[1],max_sigma[2]))
 print('von Mises stress min {:.2e}, max {:.2e}'.format(min_vonMises,max_vonMises))
 
+show_mesh = 1
+show_vonMises = 1
+show_principal_stress = 1
+
 # plotting
-visu(width,
+visu(show_mesh,show_vonMises,show_principal_stress,
+     width,
      height,
      vert,
      elem,
      nElem,
      disp,
      maxDisp,
+     sigma,
+     vonMises,
      scaleDeformation,
      vert_ind_load,
-     vert_dof_load,
+     dof_load,
      bglob,
      dof_support,
-     vonMises,
      'cantilever_quad4.png')
      
 plt.show()
