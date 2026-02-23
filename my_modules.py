@@ -439,7 +439,6 @@ def visu(show_mesh,show_vonMises,show_principal_stress,
         fig1, ax1 = plt.subplots(1, 1,figsize=(12,8),facecolor='w',frameon=False)
         fig1.patch.set_visible(False)
         
-
         # plot Mesh & BC
         patches = []
         for i in range(nElem):
@@ -481,12 +480,12 @@ def visu(show_mesh,show_vonMises,show_principal_stress,
                 markerfacecolor='blue',
                 markeredgecolor='none')
 
-        ax1.set_title('Mesh & BC')
+        # ax1.set_title('Mesh & BC')
         ax1.axis('off')
         ax1.set_xlim([0,L])
         ax1.set_ylim([0,H])
         ax1.axis('equal')
-
+        fig1.savefig(fn+'_mesh.png',dpi=300, bbox_inches='tight', pad_inches=0)
 
     if show_vonMises:
         fig2, ax2 = plt.subplots(1, 1,figsize=(12,8),facecolor='w',frameon=False)
@@ -517,13 +516,13 @@ def visu(show_mesh,show_vonMises,show_principal_stress,
         p.set_array(np.array(colors))
 
         ax2.add_collection(p)
-        ax2.set_title('Displacement & von Mises stress')
+        # ax2.set_title('Displacement & von Mises stress')
         ax2.axis('off')
         ax2.set_xlim([0,L])
         ax2.set_ylim([0,H])
         ax2.axis('equal')
 
-
+        fig2.savefig(fn+'_vonMises.png',dpi=300, bbox_inches='tight', pad_inches=0)
 
 
     if show_principal_stress:
@@ -555,7 +554,7 @@ def visu(show_mesh,show_vonMises,show_principal_stress,
         p.set_array(np.array(colors))
 
         ax3.add_collection(p)
-        ax3.set_title('Displacement & von Mises stress')
+        # ax3.set_title('Displacement & von Mises stress')
         ax3.axis('off')
         ax3.set_xlim([0,L])
         ax3.set_ylim([0,H])
@@ -602,7 +601,8 @@ def visu(show_mesh,show_vonMises,show_principal_stress,
                 ax3.plot([center[0]-s11[0],center[0]+s11[0]],[center[1]-s11[1],center[1]+s11[1]],'--k',lw=2)
                 ax3.plot([center[0]-s22[0],center[0]+s22[0]],[center[1]-s22[1],center[1]+s22[1]],'-k',lw=2)
 
-    plt.savefig(fn,dpi=300, bbox_inches='tight', pad_inches=0)
+        fig3.savefig(fn+'_principal_stress.png',dpi=300, bbox_inches='tight', pad_inches=0)
+    
 
 def compute_esize(X):
     return np.sqrt((np.max(X[:,0])-np.min(X[:,0]))**2+(np.max(X[:,1])-np.min(X[:,1]))**2)

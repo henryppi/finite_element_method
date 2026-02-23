@@ -152,6 +152,6 @@ visu(show_mesh,show_vonMises,show_principal_stress,
      dof_load,
      bglob,
      dof_support,
-     'cantilever_quad4.png')
+     './images/cantilever_quad4')
      
 plt.show()
